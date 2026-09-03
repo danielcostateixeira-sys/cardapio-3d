@@ -30,6 +30,12 @@
   document.getElementById('nota').textContent = p.nota || '';
 
   const eIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // Dois caminhos para pousar o objecto. Servem para perceber qual funciona em cada telemóvel.
+  const MODOS = {
+    browser: 'webxr scene-viewer quick-look',   // desenhado pela própria página
+    google: 'scene-viewer webxr quick-look',    // entregue à app da Google (melhor luz, mais exigente)
+  };
   const visor = document.getElementById('visor');
   const acoes = document.getElementById('acoes');
 
@@ -52,7 +58,7 @@
     if (p.usdz) mv.setAttribute('ios-src', p.usdz);
     mv.setAttribute('alt', p.nome);
     mv.setAttribute('ar', '');
-    mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look'); // Android: primeiro o Scene Viewer da Google, que ilumina melhor
+    mv.setAttribute('ar-modes', MODOS.browser); // o botão grande usa o modo do browser, que é o que mais aparelhos aceitam
     mv.setAttribute('ar-scale', 'fixed');        // tamanho real: o cliente não pode esticar
     mv.setAttribute('ar-placement', 'floor');    // mesas contam como superfície horizontal
     mv.setAttribute('camera-controls', '');
@@ -85,6 +91,19 @@
     };
     // o modelo pode já estar carregado quando chegamos aqui (ficheiro em cache)
     if (mv.loaded) mostrarMedidas(); else mv.addEventListener('load', mostrarMedidas);
+
+    // Escolha de modo, para diagnóstico: se um falhar, o outro costuma resultar.
+    const escolha = document.createElement('div');
+    escolha.className = 'modos';
+    escolha.innerHTML = '<span>Se falhar a carregar, experimente:</span>';
+    for (const [nome, etiqueta] of [['browser', 'modo browser'], ['google', 'modo Google']]) {
+      const b = document.createElement('button');
+      b.className = 'ligacao';
+      b.textContent = etiqueta;
+      b.onclick = () => { mv.setAttribute('ar-modes', MODOS[nome]); mv.activateAR(); };
+      escolha.appendChild(b);
+    }
+    acoes.appendChild(escolha);
   } else if (p.usdz && eIOS) {
     // Só USDZ: no iPhone abre direto no AR Quick Look.
     mostrarFoto('🥞');

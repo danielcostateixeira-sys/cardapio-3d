@@ -17,8 +17,12 @@ from PIL import Image
 from pxr import Gf, Usd, UsdGeom, UsdShade
 import pygltflib as g
 
-TAMANHO_TEXTURA = 2048
-QUALIDADE_JPEG = 85
+# O Scene Viewer da Google falha a carregar em telemóveis médios quando a memória de
+# textura passa de umas dezenas de MB. Estes valores mantêm-se muito abaixo disso.
+TAMANHO_TEXTURA = 1024   # cor base
+TAMANHO_NORMAIS = 1024   # relevo
+TAMANHO_RUGOSIDADE = 512  # brilho
+QUALIDADE_JPEG = 88
 
 
 def textura_base(material):
@@ -158,9 +162,9 @@ def converter(entrada, saida):
         material = g.Material(name=mat.GetPrim().GetName(), pbrMetallicRoughness=pbr, doubleSided=True)
         if rug:
             pbr.roughnessFactor = 1.0
-            pbr.metallicRoughnessTexture = g.TextureInfo(index=textura(rug, "rugosidade", 1024))
+            pbr.metallicRoughnessTexture = g.TextureInfo(index=textura(rug, "rugosidade", TAMANHO_RUGOSIDADE))
         if nrm:
-            material.normalTexture = g.NormalMaterialTexture(index=textura(nrm, "normais", 2048))
+            material.normalTexture = g.NormalMaterialTexture(index=textura(nrm, "normais", TAMANHO_NORMAIS))
         gltf.materials.append(material)
         materiais[chave] = len(gltf.materials) - 1
         return materiais[chave]
@@ -172,6 +176,14 @@ def converter(entrada, saida):
             continue
         mesh = UsdGeom.Mesh(prim)
         pos, nrm, uv = malha_para_arrays(mesh, escala)
+        # juntar vértices iguais (posição + normal + coordenada de textura)
+        junto = np.concatenate([pos, nrm, uv], axis=1)
+        _, primeiros, indices_tri = np.unique(junto, axis=0, return_index=True, return_inverse=True)
+        ordem = np.argsort(primeiros)          # manter a ordem original, mais amiga da cache
+        novo_lugar = np.empty_like(ordem)
+        novo_lugar[ordem] = np.arange(len(ordem))
+        indices_tri = novo_lugar[indices_tri.ravel()].astype(np.uint32)
+        pos, nrm, uv = pos[primeiros[ordem]], nrm[primeiros[ordem]], uv[primeiros[ordem]]
         mat = UsdShade.MaterialBindingAPI(prim).ComputeBoundMaterial()[0]
         idx_mat = material_para(mat) if mat else None
 
@@ -187,7 +199,18 @@ def converter(entrada, saida):
         a_pos = acessor(pos, g.VEC3, minmax=True)
         a_nrm = acessor(nrm, g.VEC3)
         a_uv = acessor(uv, g.VEC2)
-        prim_gl = g.Primitive(attributes=g.Attributes(POSITION=a_pos, NORMAL=a_nrm, TEXCOORD_0=a_uv), material=idx_mat)
+
+        curto = len(pos) <= 65535
+        indices_tri = indices_tri.astype(np.uint16 if curto else np.uint32)
+        bv_i = acrescentar_buffer(indices_tri.tobytes(), g.ELEMENT_ARRAY_BUFFER)
+        gltf.accessors.append(g.Accessor(
+            bufferView=bv_i,
+            componentType=g.UNSIGNED_SHORT if curto else g.UNSIGNED_INT,
+            count=len(indices_tri), type=g.SCALAR))
+        a_idx = len(gltf.accessors) - 1
+
+        prim_gl = g.Primitive(attributes=g.Attributes(POSITION=a_pos, NORMAL=a_nrm, TEXCOORD_0=a_uv),
+                              indices=a_idx, material=idx_mat)
         gltf.meshes.append(g.Mesh(name=prim.GetName(), primitives=[prim_gl]))
         gltf.nodes.append(g.Node(name=prim.GetName(), mesh=len(gltf.meshes) - 1))
         gltf.scenes[0].nodes.append(len(gltf.nodes) - 1)
