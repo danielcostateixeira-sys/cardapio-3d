@@ -6,7 +6,7 @@ window.RESTAURANTE = {
   nome: "Tasca do Zé (demonstração)",
   morada: "Rua do Exemplo 123, Porto",
   telefone: "999 999 999",
-  nota: "Aponte o telemóvel para a mesa e veja o prato em tamanho real.",
+  nota: "Aponte o telemóvel para a mesa e veja o prato em tamanho real. Passe o telemóvel devagar sobre a mesa antes de pousar o prato.",
 };
 
 window.PRATOS = [

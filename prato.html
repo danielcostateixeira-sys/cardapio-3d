@@ -78,6 +78,14 @@
     dica.className = 'dica';
     dica.textContent = 'Arraste para rodar · dois dedos para aproximar';
     visor.appendChild(dica);
+
+    // Quanto mais o telemóvel vir a mesa antes de pousar, mais certo fica o tamanho.
+    // Sem este aviso, muita gente toca no ecrã logo e o prato vai parar ao chão.
+    mv.addEventListener('ar-status', e => {
+      if (e.detail.status === 'session-started') {
+        dica.textContent = 'Passe o telemóvel devagar sobre a mesa antes de tocar.';
+      }
+    });
     mv.addEventListener('ar-status', e => {
       if (e.detail.status === 'failed') dica.textContent = 'Este aparelho não conseguiu abrir a realidade aumentada.';
     });
