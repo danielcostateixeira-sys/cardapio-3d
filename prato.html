@@ -16,6 +16,7 @@
   <div class="preco" id="preco"></div>
   <p id="descricao"></p>
   <div class="acoes" id="acoes"></div>
+  <p class="medidas" id="medidas"></p>
   <p class="pequeno" id="nota"></p>
 </section>
 <script src="dados.js"></script>
@@ -74,6 +75,16 @@
     mv.addEventListener('ar-status', e => {
       if (e.detail.status === 'failed') dica.textContent = 'Este aparelho não conseguiu abrir a realidade aumentada.';
     });
+
+    // Medidas reais lidas do próprio modelo, para se poder comparar com o prato verdadeiro.
+    const mostrarMedidas = () => {
+      const d = mv.getDimensions();
+      const cm = v => Math.round(v * 100);
+      document.getElementById('medidas').textContent =
+        'Tamanho real deste modelo: ' + cm(d.x) + ' × ' + cm(d.z) + ' cm de base, ' + cm(d.y) + ' cm de altura.';
+    };
+    // o modelo pode já estar carregado quando chegamos aqui (ficheiro em cache)
+    if (mv.loaded) mostrarMedidas(); else mv.addEventListener('load', mostrarMedidas);
   } else if (p.usdz && eIOS) {
     // Só USDZ: no iPhone abre direto no AR Quick Look.
     mostrarFoto('🥞');
