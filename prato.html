@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prato em 3D</title>
+<link rel="stylesheet" href="estilo.css">
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.1.0/dist/model-viewer.min.js"></script>
+</head>
+<body>
+<div class="visor" id="visor">
+  <a class="voltar" href="index.html">← Cardápio</a>
+</div>
+<section class="detalhe">
+  <h1 id="nome"></h1>
+  <div class="preco" id="preco"></div>
+  <p id="descricao"></p>
+  <div class="acoes" id="acoes"></div>
+  <p class="pequeno" id="nota"></p>
+</section>
+<script src="dados.js"></script>
+<script>
+  const id = new URLSearchParams(location.search).get('id');
+  const p = PRATOS.find(x => x.id === id) || PRATOS[0];
+  document.title = p.nome + ' · 3D';
+  document.getElementById('nome').textContent = p.nome;
+  document.getElementById('preco').textContent = p.preco;
+  document.getElementById('descricao').textContent = p.descricao;
+  document.getElementById('nota').textContent = p.nota || '';
+
+  const eIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const visor = document.getElementById('visor');
+  const acoes = document.getElementById('acoes');
+
+  function mostrarFoto(emoji) {
+    const foto = document.createElement('div');
+    foto.className = 'so-foto';
+    foto.textContent = emoji;
+    if (p.foto) {
+      const img = new Image();
+      img.onload = () => { foto.textContent = ''; foto.style.backgroundImage = "url('" + p.foto + "')"; };
+      img.src = p.foto;
+    }
+    visor.appendChild(foto);
+  }
+
+  if (p.glb) {
+    // Visor 3D completo: roda com o dedo, aproxima com dois dedos, e botão para pousar na mesa.
+    const mv = document.createElement('model-viewer');
+    mv.setAttribute('src', p.glb);
+    if (p.usdz) mv.setAttribute('ios-src', p.usdz);
+    mv.setAttribute('alt', p.nome);
+    mv.setAttribute('ar', '');
+    mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+    mv.setAttribute('ar-scale', 'fixed');        // tamanho real: o cliente não pode esticar
+    mv.setAttribute('ar-placement', 'floor');    // mesas contam como superfície horizontal
+    mv.setAttribute('camera-controls', '');
+    mv.setAttribute('touch-action', 'pan-y');
+    mv.setAttribute('auto-rotate', '');
+    mv.setAttribute('shadow-intensity', '1');
+    mv.setAttribute('loading', 'eager');
+
+    const botao = document.createElement('button');
+    botao.setAttribute('slot', 'ar-button');
+    botao.className = 'botao botao-ar';
+    botao.textContent = '📱 Ver na mesa';
+    mv.appendChild(botao);
+    visor.appendChild(mv);
+
+    const dica = document.createElement('div');
+    dica.className = 'dica';
+    dica.textContent = 'Arraste para rodar · dois dedos para aproximar';
+    visor.appendChild(dica);
+    mv.addEventListener('ar-status', e => {
+      if (e.detail.status === 'failed') dica.textContent = 'Este aparelho não conseguiu abrir a realidade aumentada.';
+    });
+  } else if (p.usdz && eIOS) {
+    // Só USDZ: no iPhone abre direto no AR Quick Look.
+    mostrarFoto('🥞');
+    const a = document.createElement('a');
+    a.className = 'botao';
+    a.setAttribute('rel', 'ar');
+    a.href = p.usdz;
+    const img = document.createElement('img'); img.alt = ''; img.style.display = 'none';
+    a.appendChild(img);
+    a.appendChild(document.createTextNode('📱 Ver na mesa'));
+    acoes.appendChild(a);
+  } else {
+    mostrarFoto('🍽️');
+    const aviso = document.createElement('p');
+    aviso.style.color = '#6b3d22';
+    aviso.textContent = p.usdz
+      ? 'Este prato só tem modelo para iPhone por enquanto. Abra esta página num iPhone para o ver na mesa.'
+      : 'Este prato ainda não tem modelo 3D.';
+    acoes.appendChild(aviso);
+  }
+</script>
+</body>
+</html>

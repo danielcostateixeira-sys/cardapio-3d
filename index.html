@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cardápio 3D</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="topo">
+  <h1 id="nome"></h1>
+  <p id="morada"></p>
+</header>
+<div class="aviso" id="nota"></div>
+<ul class="lista" id="lista"></ul>
+<script src="dados.js"></script>
+<script>
+  document.getElementById('nome').textContent = RESTAURANTE.nome;
+  document.getElementById('morada').textContent = RESTAURANTE.morada + (RESTAURANTE.telefone ? ' · ' + RESTAURANTE.telefone : '');
+  document.getElementById('nota').textContent = RESTAURANTE.nota;
+  document.title = RESTAURANTE.nome + ' · Cardápio 3D';
+
+  const lista = document.getElementById('lista');
+  let categoriaAnterior = null;
+  for (const p of PRATOS) {
+    if (p.categoria !== categoriaAnterior) {
+      const c = document.createElement('li');
+      c.className = 'categoria';
+      c.textContent = p.categoria;
+      lista.appendChild(c);
+      categoriaAnterior = p.categoria;
+    }
+    const li = document.createElement('li');
+    li.className = 'prato';
+    const tem3d = !!(p.glb || p.usdz);
+    const ligacao = 'prato.html?id=' + encodeURIComponent(p.id);
+
+    const foto = document.createElement('a');
+    foto.className = 'foto';
+    foto.href = ligacao;
+    if (p.foto) foto.style.backgroundImage = "url('" + p.foto + "')"; else foto.textContent = '🍽️';
+    // se a foto não existir, mostra o prato genérico
+    if (p.foto) { const img = new Image(); img.onerror = () => { foto.style.backgroundImage = ''; foto.textContent = '🍽️'; }; img.src = p.foto; }
+
+    const texto = document.createElement('div');
+    const h2 = document.createElement('h2'); h2.textContent = p.nome;
+    const desc = document.createElement('p'); desc.textContent = p.descricao;
+    const rodape = document.createElement('div'); rodape.className = 'rodape';
+    const preco = document.createElement('span'); preco.className = 'preco'; preco.textContent = p.preco;
+    rodape.appendChild(preco);
+    if (tem3d) {
+      const b = document.createElement('a'); b.className = 'botao'; b.href = ligacao; b.textContent = 'Ver em 3D';
+      rodape.appendChild(b);
+    }
+    texto.append(h2, desc, rodape);
+    li.append(foto, texto);
+    lista.appendChild(li);
+  }
+</script>
+</body>
+</html>
