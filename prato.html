@@ -51,7 +51,7 @@
     if (p.usdz) mv.setAttribute('ios-src', p.usdz);
     mv.setAttribute('alt', p.nome);
     mv.setAttribute('ar', '');
-    mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+    mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look'); // Android: primeiro o Scene Viewer da Google, que ilumina melhor
     mv.setAttribute('ar-scale', 'fixed');        // tamanho real: o cliente não pode esticar
     mv.setAttribute('ar-placement', 'floor');    // mesas contam como superfície horizontal
     mv.setAttribute('camera-controls', '');

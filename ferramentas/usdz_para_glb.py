@@ -3,9 +3,8 @@
 Uso:  python ferramentas/usdz_para_glb.py modelos/panquecas.usdz modelos/panquecas.glb
 
 Lê as malhas, as coordenadas de textura e a textura de cor base de cada material.
-Escreve um GLB à escala real em metros, com as texturas reduzidas a 2048 px em JPEG
-para ficar leve no telemóvel. Rugosidade e normais ficam de fora de propósito:
-para um cardápio no telemóvel não se nota, e poupa muitos MB.
+Escreve um GLB à escala real em metros, com cor, rugosidade e mapa de normais,
+texturas reduzidas a 2048 px em JPEG para ficar leve no telemóvel.
 
 Depende de: usd-core, pygltflib, numpy, pillow  (pip install usd-core pygltflib numpy pillow)
 """
@@ -23,8 +22,10 @@ QUALIDADE_JPEG = 85
 
 
 def textura_base(material):
-    """Devolve (caminho_dentro_do_zip, cor_constante) do material."""
+    """Devolve (caminho_cor, cor_constante, metalico, caminho_rugosidade, caminho_normais)."""
     caminho = None
+    rug = None
+    nrm = None
     cor = None
     metalico = 0.0
     for sh in material.GetPrim().GetChildren():
@@ -33,8 +34,14 @@ def textura_base(material):
         if ident == "UsdUVTexture":
             f = shader.GetInput("file").Get()
             espaco = shader.GetInput("sourceColorSpace").Get()
-            if f and espaco == "sRGB":
+            if not f:
+                continue
+            if espaco == "sRGB":
                 caminho = f.path
+            elif f.path.endswith("_n.png"):
+                nrm = f.path
+            elif f.path.endswith("_r.png"):
+                rug = f.path
         if "UsdPreviewSurface" in ident:
             d = shader.GetInput("diffuseColor")
             if d and d.Get() is not None:
@@ -42,17 +49,24 @@ def textura_base(material):
             m = shader.GetInput("metallic")
             if m and m.Get() is not None:
                 metalico = float(m.Get())
-    return caminho, cor, metalico
+    return caminho, cor, metalico, rug, nrm
 
 
-def carregar_textura(zipf, caminho):
+def carregar_textura(zipf, caminho, modo="cor", tamanho=TAMANHO_TEXTURA):
+    """modo: 'cor' | 'rugosidade' (empacota no canal verde, como o glTF exige) | 'normais'."""
     for nome in zipf.namelist():
         if nome.endswith(caminho.lstrip("./")):
-            img = Image.open(io.BytesIO(zipf.read(nome))).convert("RGB")
-            if max(img.size) > TAMANHO_TEXTURA:
-                img.thumbnail((TAMANHO_TEXTURA, TAMANHO_TEXTURA), Image.LANCZOS)
+            img = Image.open(io.BytesIO(zipf.read(nome)))
+            if modo == "rugosidade":
+                r = img.convert("L")
+                zero = Image.new("L", r.size, 0)
+                img = Image.merge("RGB", (Image.new("L", r.size, 255), r, zero))
+            else:
+                img = img.convert("RGB")
+            if max(img.size) > tamanho:
+                img.thumbnail((tamanho, tamanho), Image.LANCZOS)
             saida = io.BytesIO()
-            img.save(saida, "JPEG", quality=QUALIDADE_JPEG)
+            img.save(saida, "JPEG", quality=QUALIDADE_JPEG if modo == "cor" else 80)
             return saida.getvalue()
     raise FileNotFoundError(caminho)
 
@@ -72,7 +86,14 @@ def malha_para_arrays(mesh, escala):
     if st_idx:
         st = st[np.array(st_idx)]
 
-    pos, uv, tri = [], [], []
+    nrm_usd = mesh.GetNormalsAttr().Get()
+    nrm_interp = mesh.GetNormalsInterpolation()
+    if nrm_usd is not None:
+        # rodar as normais com a parte de rotação da matriz (sem translação)
+        rot = xf.ExtractRotationMatrix()
+        nrm_usd = np.array([rot * Gf.Vec3d(*v) for v in nrm_usd], dtype=np.float64)
+
+    pos, uv, nrm = [], [], []
     k = 0  # posição no array de índices (= índice de face-vertex)
     for n in contagens:
         fv = indices[k:k + n]
@@ -80,20 +101,21 @@ def malha_para_arrays(mesh, escala):
             for j in (0, i, i + 1):
                 v = fv[j]
                 pos.append(pontos[v])
-                if interp == "faceVarying":
-                    uv.append(st[k + j])
-                else:  # vertex / varying
-                    uv.append(st[v])
+                uv.append(st[k + j] if interp == "faceVarying" else st[v])
+                if nrm_usd is not None:
+                    nrm.append(nrm_usd[k + j] if nrm_interp == "faceVarying" else nrm_usd[v])
         k += n
     pos = np.array(pos, dtype=np.float32)
     uv = np.array(uv, dtype=np.float32)
     uv[:, 1] = 1.0 - uv[:, 1]  # USD tem origem em baixo, glTF em cima
 
-    # normais planas por triângulo (suficiente para fotogrametria)
-    a, b, c = pos[0::3], pos[1::3], pos[2::3]
-    n = np.cross(b - a, c - a)
-    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
-    normais = np.repeat(n, 3, axis=0).astype(np.float32)
+    if nrm:
+        normais = np.array(nrm, dtype=np.float32)
+    else:  # sem normais no ficheiro: planas por triângulo
+        a, b, c = pos[0::3], pos[1::3], pos[2::3]
+        n = np.cross(b - a, c - a)
+        normais = np.repeat(n, 3, axis=0).astype(np.float32)
+    normais /= np.maximum(np.linalg.norm(normais, axis=1, keepdims=True), 1e-9)
     return pos, normais, uv
 
 
@@ -120,17 +142,26 @@ def converter(entrada, saida):
         chave = str(mat.GetPath())
         if chave in materiais:
             return materiais[chave]
-        caminho, cor, metalico = textura_base(mat)
+        caminho, cor, metalico, rug, nrm = textura_base(mat)
         pbr = g.PbrMetallicRoughness(metallicFactor=metalico, roughnessFactor=0.75 if metalico < 0.5 else 0.35)
-        if caminho:
-            dados = carregar_textura(zipf, caminho)
-            bv = acrescentar_buffer(dados)
+
+        def textura(cam, modo, tamanho=TAMANHO_TEXTURA):
+            bv = acrescentar_buffer(carregar_textura(zipf, cam, modo, tamanho))
             gltf.images.append(g.Image(bufferView=bv, mimeType="image/jpeg"))
             gltf.textures.append(g.Texture(source=len(gltf.images) - 1, sampler=0))
-            pbr.baseColorTexture = g.TextureInfo(index=len(gltf.textures) - 1)
+            return len(gltf.textures) - 1
+
+        if caminho:
+            pbr.baseColorTexture = g.TextureInfo(index=textura(caminho, "cor"))
         elif cor:
             pbr.baseColorFactor = [cor[0], cor[1], cor[2], 1.0]
-        gltf.materials.append(g.Material(name=mat.GetPrim().GetName(), pbrMetallicRoughness=pbr, doubleSided=True))
+        material = g.Material(name=mat.GetPrim().GetName(), pbrMetallicRoughness=pbr, doubleSided=True)
+        if rug:
+            pbr.roughnessFactor = 1.0
+            pbr.metallicRoughnessTexture = g.TextureInfo(index=textura(rug, "rugosidade", 1024))
+        if nrm:
+            material.normalTexture = g.NormalMaterialTexture(index=textura(nrm, "normais", 2048))
+        gltf.materials.append(material)
         materiais[chave] = len(gltf.materials) - 1
         return materiais[chave]
 
