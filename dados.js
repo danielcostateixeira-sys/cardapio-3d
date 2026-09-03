@@ -11,6 +11,17 @@ window.RESTAURANTE = {
 
 window.PRATOS = [
   {
+    id: "bolo",
+    nome: "Bolo de chocolate com morangos",
+    descricao: "Bolo de chocolate de três camadas, com morangos frescos e ganache.",
+    preco: "4,50 €",
+    categoria: "Sobremesas",
+    foto: "",
+    glb: "modelos/bolo.glb",
+    usdz: "",
+    nota: "Modelo de amostra à escala real (Poly Haven, livre de direitos).",
+  },
+  {
     id: "panquecas",
     nome: "Panquecas com mirtilos e nozes",
     descricao: "Três panquecas, mirtilos frescos, nozes caramelizadas e xarope de ácer.",
