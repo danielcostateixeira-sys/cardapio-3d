@@ -17,9 +17,9 @@ window.PRATOS = [
     preco: "7,50 €",
     categoria: "Pequeno-almoço",
     foto: "fotos/panquecas.jpg",
-    glb: "",
+    glb: "modelos/panquecas.glb",
     usdz: "modelos/panquecas.usdz",
-    nota: "Modelo real, digitalizado por fotografia. Só abre em iPhone.",
+    nota: "Modelo real, digitalizado por fotografia (amostra pública da Apple).",
   },
   {
     id: "abacate",

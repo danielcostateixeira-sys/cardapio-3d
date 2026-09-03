@@ -20,10 +20,24 @@ python -m http.server 3200
 
 Depois abrir http://127.0.0.1:3200. O 3D no ecrã funciona localmente. O botão «Ver na mesa» **só funciona num telemóvel e com a página publicada em HTTPS**, porque a câmara e a realidade aumentada exigem-no.
 
+## Página publicada
+
+https://danielcostateixeira-sys.github.io/cardapio-3d/ (GitHub Pages, actualiza sozinha a cada `git push`). O QR code para a mesa está em `qr-cardapio.png` e `qr-cardapio.svg`.
+
 ## Modelos de amostra incluídos
 
-- `modelos/panquecas.usdz` — panquecas reais digitalizadas por fotografia (amostra pública da Apple). Só iPhone.
+- `modelos/panquecas.usdz` — panquecas reais digitalizadas por fotografia (amostra pública da Apple). iPhone.
+- `modelos/panquecas.glb` — as mesmas panquecas convertidas com `ferramentas/usdz_para_glb.py`. Android e computador.
 - `modelos/avocado.glb` — abacate à escala real (amostra pública do Khronos Group). Android e computador.
+
+## Converter USDZ em GLB
+
+Quando só se tem o ficheiro de iPhone:
+
+```bash
+pip install usd-core pygltflib numpy pillow
+python ferramentas/usdz_para_glb.py modelos/prato.usdz modelos/prato.glb
+```
 
 São para testar. Um prato do restaurante substitui-os.
 
